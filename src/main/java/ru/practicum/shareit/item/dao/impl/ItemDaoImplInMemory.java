@@ -34,6 +34,7 @@ public class ItemDaoImplInMemory implements ItemDao {
     @Override
     public List<Item> getList(long userId) {
         return db.values().stream()
+                .filter(item -> item.getOwner() != null && item.getOwner().getId() != null)
                 .filter(item -> item.getOwner().getId().equals(userId))
                 .collect(Collectors.toList());
     }
@@ -61,6 +62,6 @@ public class ItemDaoImplInMemory implements ItemDao {
     @Override
     public Boolean isOwnership(long itemId, long userId) {
         Item item = db.get(itemId);
-        return item != null && item.getOwner().getId().equals(userId);
+        return item != null && item.getOwner() != null && item.getOwner().getId().equals(userId);
     }
 }

@@ -56,5 +56,4 @@ public class GlobalExceptionHandler {
         log.error("Internal server error: ", e);
         return new ErrorResponse("Внутренняя ошибка сервера", LocalDateTime.now());
     }
-
 }

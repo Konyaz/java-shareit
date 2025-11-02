@@ -56,7 +56,7 @@ class ItemServiceTest {
         item.setIsAvailable(true);
         item.setOwner(owner);
 
-        when(userDao.exists(1L)).thenReturn(true);
+
         when(userDao.getById(1L)).thenReturn(owner);
         when(itemDao.create(any(Item.class))).thenReturn(item);
 
@@ -77,7 +77,8 @@ class ItemServiceTest {
         itemCreateDto.setDescription("Description");
         itemCreateDto.setAvailable(true);
 
-        when(userDao.exists(999L)).thenReturn(false);
+
+        when(userDao.getById(999L)).thenReturn(null);
 
         assertThrows(NotFoundException.class, () -> itemService.create(itemCreateDto, 999L));
     }
@@ -130,5 +131,95 @@ class ItemServiceTest {
         List<ItemDto> results = itemService.search("");
 
         assertTrue(results.isEmpty());
+    }
+
+    // Дополнительный тест для проверки получения списка предметов пользователя
+    @Test
+    void getList_ValidUser_ReturnsItems() {
+        User owner = new User();
+        owner.setId(1L);
+        owner.setName("Owner");
+
+        Item item1 = new Item();
+        item1.setId(1L);
+        item1.setName("Item1");
+        item1.setDescription("Description1");
+        item1.setIsAvailable(true);
+        item1.setOwner(owner);
+
+        Item item2 = new Item();
+        item2.setId(2L);
+        item2.setName("Item2");
+        item2.setDescription("Description2");
+        item2.setIsAvailable(false);
+        item2.setOwner(owner);
+
+        when(userDao.exists(1L)).thenReturn(true);
+        when(userDao.getById(1L)).thenReturn(owner);
+        when(itemDao.getList(1L)).thenReturn(List.of(item1, item2));
+
+        List<ItemDto> results = itemService.getList(1L);
+
+        assertNotNull(results);
+        assertEquals(2, results.size());
+        assertEquals("Item1", results.get(0).getName());
+        assertEquals("Item2", results.get(1).getName());
+    }
+
+    // Тест получения предмета по ID
+    @Test
+    void retrieveItem_ValidId_ReturnsItem() {
+        User owner = new User();
+        owner.setId(1L);
+
+        Item item = new Item();
+        item.setId(1L);
+        item.setName("Item");
+        item.setDescription("Description");
+        item.setIsAvailable(true);
+        item.setOwner(owner);
+
+        when(itemDao.exists(1L)).thenReturn(true);
+        when(itemDao.getById(1L)).thenReturn(item);
+
+        ItemDto result = itemService.retrieve(1L, 1L);
+
+        assertNotNull(result);
+        assertEquals(1L, result.getId());
+        assertEquals("Item", result.getName());
+        assertEquals("Description", result.getDescription());
+        assertTrue(result.getAvailable());
+    }
+
+    // Тест обновления предмета владельцем
+    @Test
+    void updateItem_Owner_UpdatesItem() {
+        User owner = new User();
+        owner.setId(1L);
+
+        Item existingItem = new Item();
+        existingItem.setId(1L);
+        existingItem.setName("OldName");
+        existingItem.setDescription("OldDescription");
+        existingItem.setIsAvailable(true);
+        existingItem.setOwner(owner);
+
+        ItemDto updateDto = new ItemDto();
+        updateDto.setName("NewName");
+        updateDto.setDescription("NewDescription");
+        updateDto.setAvailable(false);
+
+        when(userDao.exists(1L)).thenReturn(true);
+        when(itemDao.exists(1L)).thenReturn(true);
+        when(itemDao.isOwnership(1L, 1L)).thenReturn(true);
+        when(itemDao.getById(1L)).thenReturn(existingItem);
+        when(itemDao.update(any(Item.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ItemDto result = itemService.update(updateDto, 1L, 1L);
+
+        assertNotNull(result);
+        assertEquals("NewName", result.getName());
+        assertEquals("NewDescription", result.getDescription());
+        assertFalse(result.getAvailable());
     }
 }

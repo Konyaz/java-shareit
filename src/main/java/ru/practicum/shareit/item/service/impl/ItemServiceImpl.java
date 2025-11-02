@@ -29,14 +29,18 @@ public class ItemServiceImpl implements ItemService {
 
     @Override
     public ItemDto create(@Valid ItemCreateDto itemData, long userId) {
-        if (!userDao.exists(userId)) {
+        User owner = userDao.getById(userId);
+        if (owner == null) {
             log.error("Пользователь с id={} не найден", userId);
             throw new NotFoundException(String.format("Пользователь с id=%s не найден", userId));
         }
 
-        User owner = userDao.getById(userId);
-        Item item = ItemMapper.toItem(itemData);
+        Item item = new Item();
+        item.setName(itemData.getName());
+        item.setDescription(itemData.getDescription());
+        item.setIsAvailable(itemData.getAvailable());
         item.setOwner(owner);
+
         return ItemMapper.toItemDto(dao.create(item));
     }
 
@@ -56,31 +60,31 @@ public class ItemServiceImpl implements ItemService {
                     "Пользователь с id=%s не является владельцем вещи с id=%s", userId, itemId));
         }
 
-        Item itemToUpdate = ItemMapper.toItem(itemData);
         Item existedItem = dao.getById(itemId);
 
-        itemToUpdate.setId(existedItem.getId());
-
-        if (itemToUpdate.getName() == null || itemToUpdate.getName().isBlank()) {
-            itemToUpdate.setName(existedItem.getName());
+        if (itemData.getName() != null && !itemData.getName().isBlank()) {
+            existedItem.setName(itemData.getName());
         }
-        if (itemToUpdate.getOwner() == null) {
-            itemToUpdate.setOwner(existedItem.getOwner());
+        if (itemData.getDescription() != null && !itemData.getDescription().isBlank()) {
+            existedItem.setDescription(itemData.getDescription());
         }
-        if (itemToUpdate.getDescription() == null || itemToUpdate.getDescription().isBlank()) {
-            itemToUpdate.setDescription(existedItem.getDescription());
-        }
-        if (itemToUpdate.getIsAvailable() == null) {
-            itemToUpdate.setIsAvailable(existedItem.getIsAvailable());
+        if (itemData.getAvailable() != null) {
+            existedItem.setIsAvailable(itemData.getAvailable());
         }
 
-        return ItemMapper.toItemDto(dao.update(itemToUpdate));
+        return ItemMapper.toItemDto(dao.update(existedItem));
     }
 
     @Override
     public List<ItemDto> getList(long userId) {
         if (!userDao.exists(userId)) {
             log.error("Пользователь с id={} не найден", userId);
+            throw new NotFoundException(String.format("Пользователь с id=%s не найден", userId));
+        }
+
+        User user = userDao.getById(userId);
+        if (user == null) {
+            log.error("Пользователь с id={} не найден в базе", userId);
             throw new NotFoundException(String.format("Пользователь с id=%s не найден", userId));
         }
 
@@ -101,7 +105,6 @@ public class ItemServiceImpl implements ItemService {
 
     @Override
     public List<ItemDto> search(String text) {
-
         if (text == null || text.isBlank()) {
             return Collections.emptyList();
         }

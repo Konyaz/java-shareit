@@ -18,35 +18,42 @@ public class UserDaoImplInMemory implements UserDao {
         return currentId++;
     }
 
+    @Override
     public User create(User userData) {
         userData.setId(getNextId());
         db.put(userData.getId(), userData);
         return userData;
     }
 
+    @Override
     public User update(User userData) {
         db.put(userData.getId(), userData);
         return userData;
     }
 
+    @Override
     public List<User> getList() {
         return new ArrayList<>(db.values());
     }
 
+    @Override
     public User getById(long userId) {
         return db.get(userId);
     }
 
+    @Override
     public Boolean exists(long userId) {
         return db.containsKey(userId);
     }
 
+    @Override
     public Boolean isEmailExists(String email) {
         return db.values().stream()
                 .anyMatch((user) -> Objects.equals(user.getEmail(), email));
     }
 
-    public void removeById(long itemId) {
-        db.remove(itemId);
+    @Override
+    public void removeById(long userId) {
+        db.remove(userId);
     }
 }

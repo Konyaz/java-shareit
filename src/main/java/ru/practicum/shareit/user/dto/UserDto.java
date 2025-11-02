@@ -1,6 +1,6 @@
 package ru.practicum.shareit.user.dto;
 
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.Email;
 import lombok.Data;
 
 @Data
