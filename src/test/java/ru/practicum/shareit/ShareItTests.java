@@ -6,8 +6,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 @SpringBootTest
 class ShareItTests {
 
-	@Test
-	void contextLoads() {
-	}
+    // Тест загрузки контекста Spring - проверяет, что приложение запускается корректно
+    @Test
+    void contextLoads() {
+    }
 
 }
