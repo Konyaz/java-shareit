@@ -34,6 +34,12 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- ✅ ДОБАВЛЕНО: Spring Data JPA -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
@@ -243,5 +249,4 @@
             </build>
         </profile>
     </profiles>
-
 </project>

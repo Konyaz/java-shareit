@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ItemCreateDto {
+public class ItemUpdateDto {
 
     @NotBlank(message = "Название вещи не может быть пустым")
     private String name;

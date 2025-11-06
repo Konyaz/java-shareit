@@ -6,8 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-import ru.practicum.shareit.item.dto.ItemCreateDto;
-import ru.practicum.shareit.item.dto.ItemDto;
+import ru.practicum.shareit.item.dto.*;
 import ru.practicum.shareit.item.service.ItemService;
 
 import java.util.List;
@@ -32,20 +31,20 @@ public class ItemController {
     @PatchMapping("/{itemId}")
     public ItemDto update(@RequestHeader(OWNER_HEADER) @NotNull Long userId,
                           @PathVariable long itemId,
-                          @Valid @RequestBody ItemDto newItemData) {
+                          @Valid @RequestBody ItemUpdateDto newItemData) {
         log.info("PATCH /items/{} -> {} | userid={}", itemId, newItemData, userId);
         return service.update(newItemData, itemId, userId);
     }
 
     @GetMapping
-    public List<ItemDto> getList(@RequestHeader(OWNER_HEADER) @NotNull Long userId) {
+    public List<ItemWithBookingsDto> getList(@RequestHeader(OWNER_HEADER) @NotNull Long userId) {
         log.info("GET /items | userid={}", userId);
         return service.getList(userId);
     }
 
     @GetMapping("/{itemId}")
-    public ItemDto retrieve(@RequestHeader(OWNER_HEADER) @NotNull Long userId,
-                            @PathVariable long itemId) {
+    public ItemDetailedDto retrieve(@RequestHeader(OWNER_HEADER) @NotNull Long userId,
+                                    @PathVariable long itemId) {
         log.info("GET /items/{} | userid={}", itemId, userId);
         return service.retrieve(itemId, userId);
     }
@@ -56,4 +55,11 @@ public class ItemController {
         return service.search(text);
     }
 
+    @PostMapping("/{itemId}/comment")
+    public CommentDto addComment(@RequestHeader(OWNER_HEADER) @NotNull Long userId,
+                                 @PathVariable long itemId,
+                                 @Valid @RequestBody CommentCreateDto commentCreateDto) {
+        log.info("POST /items/{}/comment -> {} | userid={}", itemId, commentCreateDto, userId);
+        return service.addComment(itemId, userId, commentCreateDto);
+    }
 }
