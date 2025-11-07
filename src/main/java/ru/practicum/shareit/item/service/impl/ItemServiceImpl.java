@@ -81,10 +81,10 @@ public class ItemServiceImpl implements ItemService {
                     "Пользователь с id=%s не является владельцем вещи с id=%s", userId, itemId));
         }
 
-        if (itemData.getName() != null && !itemData.getName().isBlank()) {
+        if (itemData.getName() != null) {
             existingItem.setName(itemData.getName());
         }
-        if (itemData.getDescription() != null && !itemData.getDescription().isBlank()) {
+        if (itemData.getDescription() != null) {
             existingItem.setDescription(itemData.getDescription());
         }
         if (itemData.getAvailable() != null) {
@@ -153,7 +153,6 @@ public class ItemServiceImpl implements ItemService {
                     return new NotFoundException(String.format("Пользователь с id=%s не найден", userId));
                 });
 
-        // Проверка, что пользователь действительно брал вещь в аренду и аренда завершена
         boolean hasCompletedBooking = bookingRepository.existsByBookerIdAndItemIdAndStatusAndEndBefore(
                 userId, itemId, BookingStatus.APPROVED, LocalDateTime.now());
 
@@ -183,13 +182,15 @@ public class ItemServiceImpl implements ItemService {
                 .available(item.getIsAvailable())
                 .ownerId(item.getOwner() != null ? item.getOwner().getId() : null);
 
-        // Добавляем информацию о бронированиях
         LocalDateTime now = LocalDateTime.now();
 
         List<Booking> lastBookings = bookingRepository.findLastBookingForItem(item.getId(), now);
         List<Booking> nextBookings = bookingRepository.findNextBookingForItem(item.getId(), now);
+        List<Booking> currentBookings = bookingRepository.findCurrentBookingForItem(item.getId(), now);
 
-        if (!lastBookings.isEmpty()) {
+        if (!currentBookings.isEmpty()) {
+            itemBuilder.lastBooking(BookingMapper.toBookingInfoDto(currentBookings.get(0)));
+        } else if (!lastBookings.isEmpty()) {
             itemBuilder.lastBooking(BookingMapper.toBookingInfoDto(lastBookings.get(0)));
         }
 
@@ -197,7 +198,6 @@ public class ItemServiceImpl implements ItemService {
             itemBuilder.nextBooking(BookingMapper.toBookingInfoDto(nextBookings.get(0)));
         }
 
-        // Добавляем комментарии
         List<Comment> comments = commentRepository.findByItemIdWithAuthor(item.getId());
         List<CommentDto> commentDtos = comments.stream()
                 .map(CommentMapper::toCommentDto)
@@ -215,12 +215,14 @@ public class ItemServiceImpl implements ItemService {
                 .available(item.getIsAvailable())
                 .ownerId(item.getOwner() != null ? item.getOwner().getId() : null);
 
-        // Добавляем информацию о бронированиях
         LocalDateTime now = LocalDateTime.now();
         List<Booking> lastBookings = bookingRepository.findLastBookingForItem(item.getId(), now);
         List<Booking> nextBookings = bookingRepository.findNextBookingForItem(item.getId(), now);
+        List<Booking> currentBookings = bookingRepository.findCurrentBookingForItem(item.getId(), now);
 
-        if (!lastBookings.isEmpty()) {
+        if (!currentBookings.isEmpty()) {
+            dtoBuilder.lastBooking(BookingMapper.toBookingInfoDto(currentBookings.get(0)));
+        } else if (!lastBookings.isEmpty()) {
             dtoBuilder.lastBooking(BookingMapper.toBookingInfoDto(lastBookings.get(0)));
         }
 
@@ -228,7 +230,6 @@ public class ItemServiceImpl implements ItemService {
             dtoBuilder.nextBooking(BookingMapper.toBookingInfoDto(nextBookings.get(0)));
         }
 
-        // Добавляем комментарии
         List<Comment> comments = commentRepository.findByItemIdWithAuthor(item.getId());
         List<CommentDto> commentDtos = comments.stream()
                 .map(CommentMapper::toCommentDto)

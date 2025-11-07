@@ -37,7 +37,7 @@ public class BookingServiceImpl implements ru.practicum.shareit.booking.service.
     @Override
     @Transactional
     public BookingDto create(BookingCreateDto bookingCreateDto, Long userId) {
-        // Сначала проверяем даты бронирования (чтобы избежать ненужных запросов к БД)
+        // ВАЖНО: сначала проверяем даты бронирования ДО обращения к репозиториям
         validateBookingDates(bookingCreateDto);
 
         User booker = userRepository.findById(userId)
@@ -60,13 +60,6 @@ public class BookingServiceImpl implements ru.practicum.shareit.booking.service.
         if (item.getOwner().getId().equals(userId)) {
             log.error("Пользователь с id={} не может бронировать свою вещь", userId);
             throw new NotFoundException("Владелец не может бронировать свою вещь");
-        }
-
-        // Дополнительная проверка корректности дат
-        if (!bookingCreateDto.isEndAfterStart()) {
-            log.error("Некорректные даты бронирования: start={}, end={}",
-                    bookingCreateDto.getStart(), bookingCreateDto.getEnd());
-            throw new ValidationException("Дата окончания должна быть после даты начала");
         }
 
         Booking booking = Booking.builder()
@@ -261,7 +254,7 @@ public class BookingServiceImpl implements ru.practicum.shareit.booking.service.
     }
 
     private void validateBookingDates(BookingCreateDto bookingCreateDto) {
-        // Проверка дат бронирования
+        // Проверка корректности дат бронирования (ДО обращения к репозиториям)
         if (bookingCreateDto.getStart().isAfter(bookingCreateDto.getEnd()) ||
                 bookingCreateDto.getStart().isEqual(bookingCreateDto.getEnd())) {
             log.error("Некорректные даты бронирования: start={}, end={}",
@@ -269,13 +262,13 @@ public class BookingServiceImpl implements ru.practicum.shareit.booking.service.
             throw new ValidationException("Дата начала должна быть раньше даты окончания");
         }
 
-        // Проверка что дата начала не в прошлом
+        // Проверка что дата начала не в прошлом (согласно требованиям Postman-тестов)
         if (bookingCreateDto.getStart().isBefore(LocalDateTime.now())) {
             log.error("Дата начала бронирования не может быть в прошлом: start={}", bookingCreateDto.getStart());
             throw new ValidationException("Дата начала бронирования не может быть в прошлом");
         }
 
-        // Проверка что дата окончания не в прошлом
+        // Проверка что дата окончания не в прошлом (согласно требованиям Postman-тестов)
         if (bookingCreateDto.getEnd().isBefore(LocalDateTime.now())) {
             log.error("Дата окончания бронирования не может быть в прошлом: end={}", bookingCreateDto.getEnd());
             throw new ValidationException("Дата окончания бронирования не может быть в прошлом");
