@@ -119,7 +119,10 @@ public class ItemServiceImpl implements ItemService {
                     return new NotFoundException(String.format("Предмет с id=%s не найден", itemId));
                 });
         log.debug("Получена вещь с ID: {} для пользователя с ID: {}", itemId, userId);
-        return convertToDetailedDto(item);
+
+        // Проверяем, является ли пользователь владельцем вещи
+        boolean isOwner = item.getOwner().getId().equals(userId);
+        return convertToDetailedDto(item, isOwner);
     }
 
     @Override
@@ -184,20 +187,28 @@ public class ItemServiceImpl implements ItemService {
 
         LocalDateTime now = LocalDateTime.now();
 
+        // Получаем бронирования для владельца
         List<Booking> lastBookings = bookingRepository.findLastBookingForItem(item.getId(), now);
         List<Booking> nextBookings = bookingRepository.findNextBookingForItem(item.getId(), now);
         List<Booking> currentBookings = bookingRepository.findCurrentBookingForItem(item.getId(), now);
 
+        // Устанавливаем lastBooking: сначала текущие, потом завершенные
         if (!currentBookings.isEmpty()) {
             itemBuilder.lastBooking(BookingMapper.toBookingInfoDto(currentBookings.get(0)));
         } else if (!lastBookings.isEmpty()) {
             itemBuilder.lastBooking(BookingMapper.toBookingInfoDto(lastBookings.get(0)));
+        } else {
+            itemBuilder.lastBooking(null);
         }
 
+        // Устанавливаем nextBooking
         if (!nextBookings.isEmpty()) {
             itemBuilder.nextBooking(BookingMapper.toBookingInfoDto(nextBookings.get(0)));
+        } else {
+            itemBuilder.nextBooking(null);
         }
 
+        // Добавляем комментарии
         List<Comment> comments = commentRepository.findByItemIdWithAuthor(item.getId());
         List<CommentDto> commentDtos = comments.stream()
                 .map(CommentMapper::toCommentDto)
@@ -207,7 +218,7 @@ public class ItemServiceImpl implements ItemService {
         return itemBuilder.build();
     }
 
-    private ItemDetailedDto convertToDetailedDto(Item item) {
+    private ItemDetailedDto convertToDetailedDto(Item item, boolean isOwner) {
         ItemDetailedDto.ItemDetailedDtoBuilder dtoBuilder = ItemDetailedDto.builder()
                 .id(item.getId())
                 .name(item.getName())
@@ -215,21 +226,35 @@ public class ItemServiceImpl implements ItemService {
                 .available(item.getIsAvailable())
                 .ownerId(item.getOwner() != null ? item.getOwner().getId() : null);
 
-        LocalDateTime now = LocalDateTime.now();
-        List<Booking> lastBookings = bookingRepository.findLastBookingForItem(item.getId(), now);
-        List<Booking> nextBookings = bookingRepository.findNextBookingForItem(item.getId(), now);
-        List<Booking> currentBookings = bookingRepository.findCurrentBookingForItem(item.getId(), now);
+        // Если пользователь не владелец, не показываем информацию о бронированиях
+        if (!isOwner) {
+            dtoBuilder.lastBooking(null);
+            dtoBuilder.nextBooking(null);
+        } else {
+            // Для владельца показываем информацию о бронированиях
+            LocalDateTime now = LocalDateTime.now();
+            List<Booking> lastBookings = bookingRepository.findLastBookingForItem(item.getId(), now);
+            List<Booking> nextBookings = bookingRepository.findNextBookingForItem(item.getId(), now);
+            List<Booking> currentBookings = bookingRepository.findCurrentBookingForItem(item.getId(), now);
 
-        if (!currentBookings.isEmpty()) {
-            dtoBuilder.lastBooking(BookingMapper.toBookingInfoDto(currentBookings.get(0)));
-        } else if (!lastBookings.isEmpty()) {
-            dtoBuilder.lastBooking(BookingMapper.toBookingInfoDto(lastBookings.get(0)));
+            // Устанавливаем lastBooking: сначала текущие, потом завершенные
+            if (!currentBookings.isEmpty()) {
+                dtoBuilder.lastBooking(BookingMapper.toBookingInfoDto(currentBookings.get(0)));
+            } else if (!lastBookings.isEmpty()) {
+                dtoBuilder.lastBooking(BookingMapper.toBookingInfoDto(lastBookings.get(0)));
+            } else {
+                dtoBuilder.lastBooking(null);
+            }
+
+            // Устанавливаем nextBooking
+            if (!nextBookings.isEmpty()) {
+                dtoBuilder.nextBooking(BookingMapper.toBookingInfoDto(nextBookings.get(0)));
+            } else {
+                dtoBuilder.nextBooking(null);
+            }
         }
 
-        if (!nextBookings.isEmpty()) {
-            dtoBuilder.nextBooking(BookingMapper.toBookingInfoDto(nextBookings.get(0)));
-        }
-
+        // Комментарии показываем всем
         List<Comment> comments = commentRepository.findByItemIdWithAuthor(item.getId());
         List<CommentDto> commentDtos = comments.stream()
                 .map(CommentMapper::toCommentDto)
