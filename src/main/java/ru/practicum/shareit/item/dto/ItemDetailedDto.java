@@ -12,17 +12,13 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ItemDto {
+public class ItemDetailedDto {
     private Long id;
     private Long ownerId;
     private String name;
     private String description;
     private Boolean available;
-
-    // Поля для бронирований (только для владельца)
     private BookingInfoDto lastBooking;
     private BookingInfoDto nextBooking;
-
-    // Поле для комментариев
     private List<CommentDto> comments;
 }

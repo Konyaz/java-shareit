@@ -1,23 +1,34 @@
 package ru.practicum.shareit.item.dao;
 
-import lombok.experimental.UtilityClass;
 import ru.practicum.shareit.item.dto.ItemDto;
 import ru.practicum.shareit.item.model.Item;
 
-@UtilityClass
 public class ItemMapper {
-    public ItemDto toItemDto(Item item) {
-        ItemDto itemDto = new ItemDto();
 
-        itemDto.setId(item.getId());
-        itemDto.setName(item.getName());
-        itemDto.setDescription(item.getDescription());
-        itemDto.setAvailable(item.getIsAvailable());
-
-        if (item.getOwner() != null) {
-            itemDto.setOwnerId(item.getOwner().getId());
+    public static ItemDto toItemDto(Item item) {
+        if (item == null) {
+            return null;
         }
 
-        return itemDto;
+        return ItemDto.builder()
+                .id(item.getId())
+                .name(item.getName())
+                .description(item.getDescription())
+                .available(item.getIsAvailable())
+                .ownerId(item.getOwner() != null ? item.getOwner().getId() : null)
+                .build();
+    }
+
+    public static Item toItem(ItemDto itemDto) {
+        if (itemDto == null) {
+            return null;
+        }
+
+        return Item.builder()
+                .id(itemDto.getId())
+                .name(itemDto.getName())
+                .description(itemDto.getDescription())
+                .isAvailable(itemDto.getAvailable())
+                .build();
     }
 }
