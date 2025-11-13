@@ -3,6 +3,8 @@ package ru.practicum.shareit.exception;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -53,6 +55,22 @@ public class GlobalExceptionHandler {
         String errorMessage = Objects.requireNonNull(e.getBindingResult().getFieldError()).getDefaultMessage();
         log.error("MethodArgumentNotValidException: {}", errorMessage);
         return new ErrorResponse(errorMessage, LocalDateTime.now());
+    }
+
+    // Обработка отсутствующего заголовка запроса
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleMissingRequestHeader(MissingRequestHeaderException e) {
+        log.error("MissingRequestHeaderException: {}", e.getMessage());
+        return new ErrorResponse("Отсутствует обязательный заголовок: " + e.getHeaderName(), LocalDateTime.now());
+    }
+
+    // Обработка отсутствующего параметра запроса
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleMissingServletRequestParameter(MissingServletRequestParameterException e) {
+        log.error("MissingServletRequestParameterException: {}", e.getMessage());
+        return new ErrorResponse("Отсутствует обязательный параметр: " + e.getParameterName(), LocalDateTime.now());
     }
 
     // Обработка всех остальных исключений

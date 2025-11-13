@@ -10,4 +10,7 @@ import java.util.List;
 public interface CommentRepository extends JpaRepository<Comment, Long> {
     // Поиск комментариев по ID предмета с сортировкой по дате создания (новые первыми)
     List<Comment> findByItemIdOrderByCreatedDesc(Long itemId);
+
+    // Поиск комментариев по списку ID предметов - НОВЫЙ МЕТОД для избежания N+1
+    List<Comment> findByItemIdIn(List<Long> itemIds);
 }

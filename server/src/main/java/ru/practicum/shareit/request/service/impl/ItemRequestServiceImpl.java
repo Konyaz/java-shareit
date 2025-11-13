@@ -19,6 +19,7 @@ import ru.practicum.shareit.user.model.User;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -59,12 +60,21 @@ public class ItemRequestServiceImpl implements ItemRequestService {
 
         List<ItemRequest> itemRequests = itemRequestRepository.findByAuthorIdOrderByCreatedDesc(userId);
 
+        // Получаем все ID запросов
+        List<Long> requestIds = itemRequests.stream()
+                .map(ItemRequest::getId)
+                .collect(Collectors.toList());
+
+        // Загружаем все items для всех запросов одним запросом
+        Map<Long, List<Item>> itemsByRequestId = itemRepository.findByRequestIdIn(requestIds).stream()
+                .collect(Collectors.groupingBy(item -> item.getRequest().getId()));
+
         return itemRequests.stream()
                 .map(itemRequest -> {
                     ItemRequestDto itemRequestDto = itemRequestMapper.toItemRequestDto(itemRequest);
 
-                    // Добавляем список предметов, созданных в ответ на запрос
-                    List<Item> items = itemRepository.findByRequestId(itemRequestDto.getId());
+                    // Добавляем список предметов из подготовленной мапы
+                    List<Item> items = itemsByRequestId.getOrDefault(itemRequest.getId(), List.of());
                     itemRequestDto.setItems(items.stream()
                             .map(itemMapper::toItemDto)
                             .collect(Collectors.toList()));
@@ -78,12 +88,21 @@ public class ItemRequestServiceImpl implements ItemRequestService {
     public List<ItemRequestDto> getCommonList() {
         List<ItemRequest> itemRequests = itemRequestRepository.findAll();
 
+        // Получаем все ID запросов
+        List<Long> requestIds = itemRequests.stream()
+                .map(ItemRequest::getId)
+                .collect(Collectors.toList());
+
+        // Загружаем все items для всех запросов одним запросом
+        Map<Long, List<Item>> itemsByRequestId = itemRepository.findByRequestIdIn(requestIds).stream()
+                .collect(Collectors.groupingBy(item -> item.getRequest().getId()));
+
         return itemRequests.stream()
                 .map(itemRequest -> {
                     ItemRequestDto itemRequestDto = itemRequestMapper.toItemRequestDto(itemRequest);
 
-                    // Добавляем список предметов, созданных в ответ на запрос
-                    List<Item> items = itemRepository.findByRequestId(itemRequestDto.getId());
+                    // Добавляем список предметов из подготовленной мапы
+                    List<Item> items = itemsByRequestId.getOrDefault(itemRequest.getId(), List.of());
                     itemRequestDto.setItems(items.stream()
                             .map(itemMapper::toItemDto)
                             .collect(Collectors.toList()));
@@ -92,7 +111,7 @@ public class ItemRequestServiceImpl implements ItemRequestService {
                 .collect(Collectors.toList());
     }
 
-    // Получение конкретного запроса по ID
+    // Получение конкретного запроса по ID - ИСПРАВЛЕННЫЙ МЕТОД
     @Override
     public ItemRequestDto retrieve(long requestId) {
         ItemRequest itemRequest = itemRequestRepository.findById(requestId).orElseThrow(() -> {
@@ -101,11 +120,18 @@ public class ItemRequestServiceImpl implements ItemRequestService {
         });
         ItemRequestDto itemRequestDto = itemRequestMapper.toItemRequestDto(itemRequest);
 
-        // Добавляем список предметов, созданных в ответ на запрос
-        List<Item> items = itemRepository.findByRequestId(itemRequestDto.getId());
+        // ИСПРАВЛЕНИЕ: Используем групповой запрос вместо отдельного
+        // Создаем список из одного requestId и используем findByRequestIdIn
+        List<Long> requestIds = List.of(requestId);
+        Map<Long, List<Item>> itemsByRequestId = itemRepository.findByRequestIdIn(requestIds).stream()
+                .collect(Collectors.groupingBy(item -> item.getRequest().getId()));
+
+        // Добавляем список предметов из подготовленной мапы
+        List<Item> items = itemsByRequestId.getOrDefault(requestId, List.of());
         itemRequestDto.setItems(items.stream()
                 .map(itemMapper::toItemDto)
                 .collect(Collectors.toList()));
+
         return itemRequestDto;
     }
 }

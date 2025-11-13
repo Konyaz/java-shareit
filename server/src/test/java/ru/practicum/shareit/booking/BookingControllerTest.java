@@ -90,7 +90,7 @@ class BookingControllerTest {
 
     // Создание бронирования с валидными данными
     @Test
-    void createBookingValidDataReturnsBookingDto() throws Exception {
+    void createBooking_ValidData_ReturnsBookingDto() throws Exception {
         Mockito.when(bookingService.create(anyLong(), any(BookingCreateDto.class))).thenReturn(bookingDto);
 
         mockMvc.perform(post("/bookings")
@@ -108,16 +108,16 @@ class BookingControllerTest {
 
     // Создание бронирования без заголовка пользователя
     @Test
-    void createBookingMissingUserIdHeaderReturnsInternalServerError() throws Exception {
+    void createBooking_MissingUserIdHeader_ReturnsBadRequest() throws Exception {
         mockMvc.perform(post("/bookings")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validBookingCreateDto)))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isBadRequest());
     }
 
     // Создание бронирования для несуществующего предмета
     @Test
-    void createBookingItemNotFoundReturnsNotFound() throws Exception {
+    void createBooking_ItemNotFound_ReturnsNotFound() throws Exception {
         Mockito.when(bookingService.create(anyLong(), any(BookingCreateDto.class)))
                 .thenThrow(new NotFoundException("Вещь с id=999 не найдена"));
 
@@ -128,9 +128,22 @@ class BookingControllerTest {
                 .andExpect(status().isNotFound());
     }
 
+    // Создание бронирования с ValidationException от сервиса
+    @Test
+    void createBooking_ValidationException_ReturnsBadRequest() throws Exception {
+        Mockito.when(bookingService.create(anyLong(), any(BookingCreateDto.class)))
+                .thenThrow(new ValidationException("Неверные даты бронирования"));
+
+        mockMvc.perform(post("/bookings")
+                        .header(OWNER_HEADER, "2")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validBookingCreateDto)))
+                .andExpect(status().isBadRequest());
+    }
+
     // Подтверждение бронирования с валидными данными
     @Test
-    void approveBookingValidDataReturnsApprovedBooking() throws Exception {
+    void approveBooking_ValidData_ReturnsApprovedBooking() throws Exception {
         Mockito.when(bookingService.approve(anyLong(), anyLong(), anyBoolean())).thenReturn(approvedBookingDto);
 
         mockMvc.perform(patch("/bookings/1")
@@ -140,17 +153,41 @@ class BookingControllerTest {
                 .andExpect(jsonPath("$.status", is("APPROVED")));
     }
 
+    // Подтверждение бронирования с отклонением
+    @Test
+    void approveBooking_RejectBooking_ReturnsRejectedBooking() throws Exception {
+        BookingDto rejectedBookingDto = new BookingDto();
+        rejectedBookingDto.setId(1L);
+        rejectedBookingDto.setStatus(Status.REJECTED);
+
+        Mockito.when(bookingService.approve(anyLong(), anyLong(), anyBoolean())).thenReturn(rejectedBookingDto);
+
+        mockMvc.perform(patch("/bookings/1")
+                        .header(OWNER_HEADER, "1")
+                        .param("approved", "false"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("REJECTED")));
+    }
+
     // Подтверждение бронирования без заголовка пользователя
     @Test
-    void approveBookingMissingUserIdHeaderReturnsInternalServerError() throws Exception {
+    void approveBooking_MissingUserIdHeader_ReturnsBadRequest() throws Exception {
         mockMvc.perform(patch("/bookings/1")
                         .param("approved", "true"))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isBadRequest());
+    }
+
+    // Подтверждение бронирования без параметра approved
+    @Test
+    void approveBooking_MissingApprovedParam_ReturnsBadRequest() throws Exception {
+        mockMvc.perform(patch("/bookings/1")
+                        .header(OWNER_HEADER, "1"))
+                .andExpect(status().isBadRequest());
     }
 
     // Подтверждение бронирования без прав доступа
     @Test
-    void approveBookingAccessDeniedReturnsForbidden() throws Exception {
+    void approveBooking_AccessDenied_ReturnsForbidden() throws Exception {
         Mockito.when(bookingService.approve(anyLong(), anyLong(), anyBoolean()))
                 .thenThrow(new AccessDeniedException("Пользователь не является владельцем вещи"));
 
@@ -162,7 +199,7 @@ class BookingControllerTest {
 
     // Подтверждение несуществующего бронирования
     @Test
-    void approveBookingNotFoundReturnsNotFound() throws Exception {
+    void approveBooking_NotFound_ReturnsNotFound() throws Exception {
         Mockito.when(bookingService.approve(anyLong(), anyLong(), anyBoolean()))
                 .thenThrow(new NotFoundException("Бронирование с id=999 не найдено"));
 
@@ -172,9 +209,21 @@ class BookingControllerTest {
                 .andExpect(status().isNotFound());
     }
 
+    // Подтверждение бронирования с ValidationException
+    @Test
+    void approveBooking_ValidationException_ReturnsBadRequest() throws Exception {
+        Mockito.when(bookingService.approve(anyLong(), anyLong(), anyBoolean()))
+                .thenThrow(new ValidationException("Бронирование уже обработано"));
+
+        mockMvc.perform(patch("/bookings/1")
+                        .header(OWNER_HEADER, "1")
+                        .param("approved", "true"))
+                .andExpect(status().isBadRequest());
+    }
+
     // Получение бронирования по ID
     @Test
-    void getBookingValidDataReturnsBooking() throws Exception {
+    void getBooking_ValidData_ReturnsBooking() throws Exception {
         Mockito.when(bookingService.get(anyLong(), anyLong())).thenReturn(bookingDto);
 
         mockMvc.perform(get("/bookings/1")
@@ -188,14 +237,14 @@ class BookingControllerTest {
 
     // Получение бронирования без заголовка пользователя
     @Test
-    void getBookingMissingUserIdHeaderReturnsInternalServerError() throws Exception {
+    void getBooking_MissingUserIdHeader_ReturnsBadRequest() throws Exception {
         mockMvc.perform(get("/bookings/1"))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isBadRequest());
     }
 
     // Получение несуществующего бронирования
     @Test
-    void getBookingNotFoundReturnsNotFound() throws Exception {
+    void getBooking_NotFound_ReturnsNotFound() throws Exception {
         Mockito.when(bookingService.get(anyLong(), anyLong()))
                 .thenThrow(new NotFoundException("Бронирование с id=999 не найдено"));
 
@@ -204,32 +253,133 @@ class BookingControllerTest {
                 .andExpect(status().isNotFound());
     }
 
-    // Получение всех бронирований пользователя
+    // Получение бронирования без прав доступа
     @Test
-    void getAllByUserValidDataReturnsBookingList() throws Exception {
+    void getBooking_AccessDenied_ReturnsForbidden() throws Exception {
+        Mockito.when(bookingService.get(anyLong(), anyLong()))
+                .thenThrow(new AccessDeniedException("Доступ запрещен"));
+
+        mockMvc.perform(get("/bookings/1")
+                        .header(OWNER_HEADER, "999"))
+                .andExpect(status().isForbidden());
+    }
+
+    // Получение всех бронирований пользователя с состоянием ALL
+    @Test
+    void getAllByUser_ValidStateAll_ReturnsBookingList() throws Exception {
         Mockito.when(bookingService.getAllByUser(anyLong(), anyString(), anyInt(), anyInt()))
                 .thenReturn(List.of(bookingDto));
 
         mockMvc.perform(get("/bookings")
                         .header(OWNER_HEADER, "2")
-                        .param("state", "ALL"))
+                        .param("state", "ALL")
+                        .param("from", "0")
+                        .param("size", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()", is(1)))
                 .andExpect(jsonPath("$[0].id", is(1)))
                 .andExpect(jsonPath("$[0].booker.id", is(2)));
     }
 
+    // Получение всех бронирований пользователя с состоянием CURRENT
+    @Test
+    void getAllByUser_ValidStateCurrent_ReturnsBookingList() throws Exception {
+        Mockito.when(bookingService.getAllByUser(anyLong(), anyString(), anyInt(), anyInt()))
+                .thenReturn(List.of(bookingDto));
+
+        mockMvc.perform(get("/bookings")
+                        .header(OWNER_HEADER, "2")
+                        .param("state", "CURRENT")
+                        .param("from", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()", is(1)));
+    }
+
+    // Получение всех бронирований пользователя с состоянием PAST
+    @Test
+    void getAllByUser_ValidStatePast_ReturnsBookingList() throws Exception {
+        Mockito.when(bookingService.getAllByUser(anyLong(), anyString(), anyInt(), anyInt()))
+                .thenReturn(List.of(bookingDto));
+
+        mockMvc.perform(get("/bookings")
+                        .header(OWNER_HEADER, "2")
+                        .param("state", "PAST")
+                        .param("from", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()", is(1)));
+    }
+
+    // Получение всех бронирований пользователя с состоянием FUTURE
+    @Test
+    void getAllByUser_ValidStateFuture_ReturnsBookingList() throws Exception {
+        Mockito.when(bookingService.getAllByUser(anyLong(), anyString(), anyInt(), anyInt()))
+                .thenReturn(List.of(bookingDto));
+
+        mockMvc.perform(get("/bookings")
+                        .header(OWNER_HEADER, "2")
+                        .param("state", "FUTURE")
+                        .param("from", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()", is(1)));
+    }
+
+    // Получение всех бронирований пользователя с состоянием WAITING
+    @Test
+    void getAllByUser_ValidStateWaiting_ReturnsBookingList() throws Exception {
+        Mockito.when(bookingService.getAllByUser(anyLong(), anyString(), anyInt(), anyInt()))
+                .thenReturn(List.of(bookingDto));
+
+        mockMvc.perform(get("/bookings")
+                        .header(OWNER_HEADER, "2")
+                        .param("state", "WAITING")
+                        .param("from", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()", is(1)));
+    }
+
+    // Получение всех бронирований пользователя с состоянием REJECTED
+    @Test
+    void getAllByUser_ValidStateRejected_ReturnsBookingList() throws Exception {
+        Mockito.when(bookingService.getAllByUser(anyLong(), anyString(), anyInt(), anyInt()))
+                .thenReturn(List.of(bookingDto));
+
+        mockMvc.perform(get("/bookings")
+                        .header(OWNER_HEADER, "2")
+                        .param("state", "REJECTED")
+                        .param("from", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()", is(1)));
+    }
+
+    // Получение всех бронирований пользователя без параметров пагинации
+    @Test
+    void getAllByUser_WithoutPagination_ReturnsBookingList() throws Exception {
+        Mockito.when(bookingService.getAllByUser(anyLong(), anyString(), anyInt(), anyInt()))
+                .thenReturn(List.of(bookingDto));
+
+        mockMvc.perform(get("/bookings")
+                        .header(OWNER_HEADER, "2")
+                        .param("state", "ALL"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()", is(1)));
+    }
+
     // Получение всех бронирований пользователя без заголовка
     @Test
-    void getAllByUserMissingUserIdHeaderReturnsInternalServerError() throws Exception {
+    void getAllByUser_MissingUserIdHeader_ReturnsBadRequest() throws Exception {
         mockMvc.perform(get("/bookings")
                         .param("state", "ALL"))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isBadRequest());
     }
 
     // Получение всех бронирований пользователя с невалидным статусом
     @Test
-    void getAllByUserInvalidStateReturnsBadRequest() throws Exception {
+    void getAllByUser_InvalidState_ReturnsBadRequest() throws Exception {
         Mockito.when(bookingService.getAllByUser(anyLong(), anyString(), anyInt(), anyInt()))
                 .thenThrow(new ValidationException("Unknown state: INVALID_STATE"));
 
@@ -239,9 +389,115 @@ class BookingControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
-    // Получение всех бронирований владельца
+    // Получение всех бронирований пользователя с ValidationException
     @Test
-    void getAllByOwnerValidDataReturnsBookingList() throws Exception {
+    void getAllByUser_ValidationException_ReturnsBadRequest() throws Exception {
+        Mockito.when(bookingService.getAllByUser(anyLong(), anyString(), anyInt(), anyInt()))
+                .thenThrow(new ValidationException("Неверные параметры пагинации"));
+
+        mockMvc.perform(get("/bookings")
+                        .header(OWNER_HEADER, "2")
+                        .param("state", "ALL")
+                        .param("from", "0")
+                        .param("size", "10"))
+                .andExpect(status().isBadRequest());
+    }
+
+    // Получение всех бронирований владельца с состоянием ALL
+    @Test
+    void getAllByOwner_ValidStateAll_ReturnsBookingList() throws Exception {
+        Mockito.when(bookingService.getAllByOwner(anyLong(), anyString(), anyInt(), anyInt()))
+                .thenReturn(List.of(bookingDto));
+
+        mockMvc.perform(get("/bookings/owner")
+                        .header(OWNER_HEADER, "1")
+                        .param("state", "ALL")
+                        .param("from", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()", is(1)))
+                .andExpect(jsonPath("$[0].id", is(1)))
+                .andExpect(jsonPath("$[0].item.id", is(1)));
+    }
+
+    // Получение всех бронирований владельца с состоянием CURRENT
+    @Test
+    void getAllByOwner_ValidStateCurrent_ReturnsBookingList() throws Exception {
+        Mockito.when(bookingService.getAllByOwner(anyLong(), anyString(), anyInt(), anyInt()))
+                .thenReturn(List.of(bookingDto));
+
+        mockMvc.perform(get("/bookings/owner")
+                        .header(OWNER_HEADER, "1")
+                        .param("state", "CURRENT")
+                        .param("from", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()", is(1)));
+    }
+
+    // Получение всех бронирований владельца с состоянием PAST
+    @Test
+    void getAllByOwner_ValidStatePast_ReturnsBookingList() throws Exception {
+        Mockito.when(bookingService.getAllByOwner(anyLong(), anyString(), anyInt(), anyInt()))
+                .thenReturn(List.of(bookingDto));
+
+        mockMvc.perform(get("/bookings/owner")
+                        .header(OWNER_HEADER, "1")
+                        .param("state", "PAST")
+                        .param("from", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()", is(1)));
+    }
+
+    // Получение всех бронирований владельца с состоянием FUTURE
+    @Test
+    void getAllByOwner_ValidStateFuture_ReturnsBookingList() throws Exception {
+        Mockito.when(bookingService.getAllByOwner(anyLong(), anyString(), anyInt(), anyInt()))
+                .thenReturn(List.of(bookingDto));
+
+        mockMvc.perform(get("/bookings/owner")
+                        .header(OWNER_HEADER, "1")
+                        .param("state", "FUTURE")
+                        .param("from", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()", is(1)));
+    }
+
+    // Получение всех бронирований владельца с состоянием WAITING
+    @Test
+    void getAllByOwner_ValidStateWaiting_ReturnsBookingList() throws Exception {
+        Mockito.when(bookingService.getAllByOwner(anyLong(), anyString(), anyInt(), anyInt()))
+                .thenReturn(List.of(bookingDto));
+
+        mockMvc.perform(get("/bookings/owner")
+                        .header(OWNER_HEADER, "1")
+                        .param("state", "WAITING")
+                        .param("from", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()", is(1)));
+    }
+
+    // Получение всех бронирований владельца с состоянием REJECTED
+    @Test
+    void getAllByOwner_ValidStateRejected_ReturnsBookingList() throws Exception {
+        Mockito.when(bookingService.getAllByOwner(anyLong(), anyString(), anyInt(), anyInt()))
+                .thenReturn(List.of(bookingDto));
+
+        mockMvc.perform(get("/bookings/owner")
+                        .header(OWNER_HEADER, "1")
+                        .param("state", "REJECTED")
+                        .param("from", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()", is(1)));
+    }
+
+    // Получение всех бронирований владельца без параметров пагинации
+    @Test
+    void getAllByOwner_WithoutPagination_ReturnsBookingList() throws Exception {
         Mockito.when(bookingService.getAllByOwner(anyLong(), anyString(), anyInt(), anyInt()))
                 .thenReturn(List.of(bookingDto));
 
@@ -249,22 +505,20 @@ class BookingControllerTest {
                         .header(OWNER_HEADER, "1")
                         .param("state", "ALL"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()", is(1)))
-                .andExpect(jsonPath("$[0].id", is(1)))
-                .andExpect(jsonPath("$[0].item.id", is(1)));
+                .andExpect(jsonPath("$.length()", is(1)));
     }
 
     // Получение всех бронирований владельца без заголовка
     @Test
-    void getAllByOwnerMissingUserIdHeaderReturnsInternalServerError() throws Exception {
+    void getAllByOwner_MissingUserIdHeader_ReturnsBadRequest() throws Exception {
         mockMvc.perform(get("/bookings/owner")
                         .param("state", "ALL"))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isBadRequest());
     }
 
     // Получение всех бронирований владельца с невалидным статусом
     @Test
-    void getAllByOwnerInvalidStateReturnsBadRequest() throws Exception {
+    void getAllByOwner_InvalidState_ReturnsBadRequest() throws Exception {
         Mockito.when(bookingService.getAllByOwner(anyLong(), anyString(), anyInt(), anyInt()))
                 .thenThrow(new ValidationException("Unknown state: INVALID_STATE"));
 
@@ -272,5 +526,32 @@ class BookingControllerTest {
                         .header(OWNER_HEADER, "1")
                         .param("state", "INVALID_STATE"))
                 .andExpect(status().isBadRequest());
+    }
+
+    // Получение всех бронирований владельца с ValidationException
+    @Test
+    void getAllByOwner_ValidationException_ReturnsBadRequest() throws Exception {
+        Mockito.when(bookingService.getAllByOwner(anyLong(), anyString(), anyInt(), anyInt()))
+                .thenThrow(new ValidationException("Неверные параметры пагинации"));
+
+        mockMvc.perform(get("/bookings/owner")
+                        .header(OWNER_HEADER, "1")
+                        .param("state", "ALL")
+                        .param("from", "0")
+                        .param("size", "10"))
+                .andExpect(status().isBadRequest());
+    }
+
+    // Получение пустого списка бронирований владельца
+    @Test
+    void getAllByOwner_NoBookings_ReturnsEmptyList() throws Exception {
+        Mockito.when(bookingService.getAllByOwner(anyLong(), anyString(), anyInt(), anyInt()))
+                .thenReturn(List.of());
+
+        mockMvc.perform(get("/bookings/owner")
+                        .header(OWNER_HEADER, "1")
+                        .param("state", "ALL"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()", is(0)));
     }
 }

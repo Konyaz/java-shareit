@@ -27,13 +27,13 @@ public class Booking {
     @Column(name = "end_date")
     private LocalDateTime end;
 
-    // Предмет, который бронируется
-    @ManyToOne
+    // Предмет, который бронируется - LAZY загрузка для избежания N+1
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "item_id")
     private Item item;
 
-    // Пользователь, который бронирует предмет
-    @ManyToOne
+    // Пользователь, который бронирует предмет - LAZY загрузка для избежания N+1
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "booker_id")
     private User booker;
 

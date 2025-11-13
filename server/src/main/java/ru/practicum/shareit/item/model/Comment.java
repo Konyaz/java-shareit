@@ -21,13 +21,13 @@ public class Comment {
     @Column
     private String text;
 
-    // Предмет к которому относится комментарий
-    @ManyToOne
+    // Предмет к которому относится комментарий - LAZY загрузка для избежания N+1
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "item_id")
     private Item item;
 
-    // Автор комментария
-    @ManyToOne
+    // Автор комментария - LAZY загрузка для избежания N+1
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id")
     private User author;
 

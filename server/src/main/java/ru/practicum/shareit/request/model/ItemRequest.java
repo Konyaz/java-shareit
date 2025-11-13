@@ -23,8 +23,8 @@ public class ItemRequest {
     @Column
     private String description;
 
-    // Автор запроса
-    @ManyToOne
+    // Автор запроса - LAZY загрузка для избежания N+1
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id")
     private User author;
 
@@ -32,7 +32,7 @@ public class ItemRequest {
     @Column
     private LocalDateTime created;
 
-    // Список предметов, созданных в ответ на запрос
-    @OneToMany(mappedBy = "request", cascade = CascadeType.ALL)
+    // Список предметов, созданных в ответ на запрос - LAZY загрузка для избежания N+1
+    @OneToMany(mappedBy = "request", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Item> items;
 }

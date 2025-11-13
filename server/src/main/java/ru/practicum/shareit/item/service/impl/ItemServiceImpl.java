@@ -23,8 +23,7 @@ import ru.practicum.shareit.user.dao.UserRepository;
 import ru.practicum.shareit.user.model.User;
 
 import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -49,7 +48,12 @@ public class ItemServiceImpl implements ItemService {
             log.error("Пользователь с id={} не найден", userId);
             return new NotFoundException(String.format("Пользователь с id=%s не найден", userId));
         });
+
         Item item = itemMapper.toItem(itemData);
+        if (item == null) {
+            throw new IllegalArgumentException("Item cannot be null after mapping");
+        }
+
         item.setOwner(owner);
 
         // Если указан ID запроса, связываем предмет с запросом
@@ -112,27 +116,53 @@ public class ItemServiceImpl implements ItemService {
         List<Item> items = itemRepository.findByOwnerId(userId);
         LocalDateTime now = LocalDateTime.now();
 
+        // Получаем все ID предметов
+        List<Long> itemIds = items.stream()
+                .map(Item::getId)
+                .collect(Collectors.toList());
+
+        // Загружаем все последние бронирования одним запросом и группируем по itemId
+        List<Booking> lastBookingsList = new ArrayList<>(bookingRepository.findLastBookingsByItemIds(itemIds, now));
+        Map<Long, List<Booking>> lastBookingsByItemId = lastBookingsList.stream()
+                .collect(Collectors.groupingBy(booking -> booking.getItem().getId()));
+
+        // Загружаем все следующие бронирования одним запросом и группируем по itemId
+        List<Booking> nextBookingsList = new ArrayList<>(bookingRepository.findNextBookingsByItemIds(itemIds, now));
+        Map<Long, List<Booking>> nextBookingsByItemId = nextBookingsList.stream()
+                .collect(Collectors.groupingBy(booking -> booking.getItem().getId()));
+
+        // Загружаем все комментарии одним запросом и группируем по itemId
+        List<Comment> commentsList = new ArrayList<>(commentRepository.findByItemIdIn(itemIds));
+        Map<Long, List<Comment>> commentsByItemId = commentsList.stream()
+                .collect(Collectors.groupingBy(comment -> comment.getItem().getId()));
+
         return items.stream()
                 .map(item -> {
                     ItemDto itemDto = itemMapper.toItemDto(item);
 
                     // Если пользователь является владельцем вещи, добавляем даты бронирований
                     if (item.getOwner().getId() == userId) {
-                        // Получаем последнее бронирование
-                        List<Booking> lastBookings = bookingRepository.findLastBookingByItemId(item.getId(), now);
+                        // Получаем последнее бронирование из подготовленной мапы
+                        List<Booking> lastBookings = new ArrayList<>(lastBookingsByItemId.getOrDefault(item.getId(), Collections.emptyList()));
                         if (!lastBookings.isEmpty()) {
+                            // Сортируем по end в порядке убывания и берем первый элемент
+                            lastBookings.sort(Comparator.comparing(Booking::getEnd).reversed());
                             itemDto.setLastBooking(lastBookings.get(0).getStart());
                         }
 
-                        // Получаем следующее бронирование
-                        List<Booking> nextBookings = bookingRepository.findNextBookingByItemId(item.getId(), now);
+                        // Получаем следующее бронирование из подготовленной мапы
+                        List<Booking> nextBookings = new ArrayList<>(nextBookingsByItemId.getOrDefault(item.getId(), Collections.emptyList()));
                         if (!nextBookings.isEmpty()) {
+                            // Сортируем по start в порядке возрастания и берем первый элемент
+                            nextBookings.sort(Comparator.comparing(Booking::getStart));
                             itemDto.setNextBooking(nextBookings.get(0).getStart());
                         }
                     }
 
-                    // Добавляем комментарии
-                    List<Comment> comments = commentRepository.findByItemIdOrderByCreatedDesc(item.getId());
+                    // Добавляем комментарии из подготовленной мапы
+                    List<Comment> comments = new ArrayList<>(commentsByItemId.getOrDefault(item.getId(), Collections.emptyList()));
+                    // Сортируем комментарии по дате создания (новые первыми)
+                    comments.sort(Comparator.comparing(Comment::getCreated).reversed());
                     itemDto.setComments(comments.stream()
                             .map(commentMapper::toCommentDto)
                             .collect(Collectors.toList()));
@@ -142,7 +172,7 @@ public class ItemServiceImpl implements ItemService {
                 .collect(Collectors.toList());
     }
 
-    // Получение конкретного предмета по ID
+    // Получение конкретного предмета по ID - ИСПРАВЛЕННЫЙ МЕТОД
     @Override
     public ItemDto retrieve(long itemId, long userId) {
         Item item = itemRepository.findById(itemId).orElseThrow(() -> {
@@ -155,21 +185,29 @@ public class ItemServiceImpl implements ItemService {
         if (item.getOwner().getId() == userId) {
             LocalDateTime now = LocalDateTime.now();
 
-            // Получаем последнее бронирование
-            List<Booking> lastBookings = bookingRepository.findLastBookingByItemId(itemId, now);
-            if (!lastBookings.isEmpty()) {
-                itemDto.setLastBooking(lastBookings.get(0).getStart());
+            // ИСПРАВЛЕНИЕ: Используем групповые методы вместо отдельных запросов
+            List<Long> itemIds = List.of(itemId);
+
+            // Получаем последние бронирования для списка items (одного элемента)
+            List<Booking> lastBookingsList = new ArrayList<>(bookingRepository.findLastBookingsByItemIds(itemIds, now));
+            if (!lastBookingsList.isEmpty()) {
+                // Сортируем по end в порядке убывания и берем первый элемент
+                lastBookingsList.sort(Comparator.comparing(Booking::getEnd).reversed());
+                itemDto.setLastBooking(lastBookingsList.get(0).getStart());
             }
 
-            // Получаем следующее бронирование
-            List<Booking> nextBookings = bookingRepository.findNextBookingByItemId(itemId, now);
-            if (!nextBookings.isEmpty()) {
-                itemDto.setNextBooking(nextBookings.get(0).getStart());
+            // Получаем следующие бронирования для списка items (одного элемента)
+            List<Booking> nextBookingsList = new ArrayList<>(bookingRepository.findNextBookingsByItemIds(itemIds, now));
+            if (!nextBookingsList.isEmpty()) {
+                // Сортируем по start в порядке возрастания и берем первый элемент
+                nextBookingsList.sort(Comparator.comparing(Booking::getStart));
+                itemDto.setNextBooking(nextBookingsList.get(0).getStart());
             }
         }
 
         // Добавляем комментарии
-        List<Comment> comments = commentRepository.findByItemIdOrderByCreatedDesc(itemId);
+        // Оставляем отдельный запрос для комментариев, так как это один запрос
+        List<Comment> comments = new ArrayList<>(commentRepository.findByItemIdOrderByCreatedDesc(itemId));
         itemDto.setComments(comments.stream()
                 .map(commentMapper::toCommentDto)
                 .collect(Collectors.toList()));

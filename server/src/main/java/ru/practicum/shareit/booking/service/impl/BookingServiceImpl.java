@@ -2,6 +2,8 @@ package ru.practicum.shareit.booking.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,10 +56,7 @@ public class BookingServiceImpl implements BookingService {
         }
 
         // Проверка корректности дат бронирования
-        if (bookingCreateDto.getEnd().isBefore(bookingCreateDto.getStart()) ||
-                bookingCreateDto.getEnd().equals(bookingCreateDto.getStart())) {
-            throw new ValidationException("Дата окончания бронирования должна быть позже даты начала");
-        }
+        validateBookingDates(bookingCreateDto.getStart(), bookingCreateDto.getEnd());
 
         Booking booking = new Booking();
         booking.setStart(bookingCreateDto.getStart());
@@ -111,43 +110,43 @@ public class BookingServiceImpl implements BookingService {
         userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("Пользователь с id=" + userId + " не найден"));
 
-        Sort sort = Sort.by(Sort.Direction.DESC, "start");
+        // Валидация параметров пагинации
+        validatePaginationParameters(from, size);
+
+        // Создаем пагинацию с правильным смещением
+        Pageable pageable = PageRequest.of(from / size, size, Sort.by(Sort.Direction.DESC, "start"));
         List<Booking> bookings;
 
         // Обработка различных состояний бронирований
         switch (state) {
             case "ALL":
-                bookings = bookingRepository.findByBookerId(userId, sort);
+                bookings = bookingRepository.findByBookerIdWithPagination(userId, pageable);
                 break;
             case "CURRENT":
-                bookings = bookingRepository.findByBookerIdAndStartIsBeforeAndEndIsAfter(userId, LocalDateTime.now(),
-                        LocalDateTime.now(), sort);
+                bookings = bookingRepository.findByBookerIdAndStartIsBeforeAndEndIsAfterWithPagination(
+                        userId, LocalDateTime.now(), LocalDateTime.now(), pageable);
                 break;
             case "PAST":
-                bookings = bookingRepository.findByBookerIdAndEndIsBefore(userId, LocalDateTime.now(), sort);
+                bookings = bookingRepository.findByBookerIdAndEndIsBeforeWithPagination(
+                        userId, LocalDateTime.now(), pageable);
                 break;
             case "FUTURE":
-                bookings = bookingRepository.findByBookerIdAndStartIsAfter(userId, LocalDateTime.now(), sort);
+                bookings = bookingRepository.findByBookerIdAndStartIsAfterWithPagination(
+                        userId, LocalDateTime.now(), pageable);
                 break;
             case "WAITING":
-                bookings = bookingRepository.findByBookerIdAndStatusIs(userId, Status.WAITING, sort);
+                bookings = bookingRepository.findByBookerIdAndStatusIsWithPagination(
+                        userId, Status.WAITING, pageable);
                 break;
             case "REJECTED":
-                bookings = bookingRepository.findByBookerIdAndStatusIs(userId, Status.REJECTED, sort);
+                bookings = bookingRepository.findByBookerIdAndStatusIsWithPagination(
+                        userId, Status.REJECTED, pageable);
                 break;
             default:
                 throw new ValidationException("Unknown state: " + state);
         }
 
-        // Применяем пагинацию
-        int startIndex = from;
-        int endIndex = Math.min(startIndex + size, bookings.size());
-
-        if (startIndex > bookings.size()) {
-            return List.of();
-        }
-
-        return bookings.subList(startIndex, endIndex).stream()
+        return bookings.stream()
                 .map(bookingMapper::toBookingDto)
                 .collect(Collectors.toList());
     }
@@ -158,6 +157,9 @@ public class BookingServiceImpl implements BookingService {
         userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("Пользователь с id=" + userId + " не найден"));
 
+        // Валидация параметров пагинации
+        validatePaginationParameters(from, size);
+
         // Получаем список ID всех предметов владельца
         List<Long> itemIds = itemRepository.findByOwnerId(userId).stream()
                 .map(Item::getId)
@@ -167,44 +169,63 @@ public class BookingServiceImpl implements BookingService {
             return List.of();
         }
 
-        Sort sort = Sort.by(Sort.Direction.DESC, "start");
+        // Создаем пагинацию с правильным смещением
+        Pageable pageable = PageRequest.of(from / size, size, Sort.by(Sort.Direction.DESC, "start"));
         List<Booking> bookings;
 
         // Обработка различных состояний бронирований для предметов владельца
         switch (state) {
             case "ALL":
-                bookings = bookingRepository.findByItemIdIn(itemIds, sort);
+                bookings = bookingRepository.findByItemIdInWithPagination(itemIds, pageable);
                 break;
             case "CURRENT":
-                bookings = bookingRepository.findByItemIdInAndStartIsBeforeAndEndIsAfter(itemIds, LocalDateTime.now(),
-                        LocalDateTime.now(), sort);
+                bookings = bookingRepository.findByItemIdInAndStartIsBeforeAndEndIsAfterWithPagination(
+                        itemIds, LocalDateTime.now(), LocalDateTime.now(), pageable);
                 break;
             case "PAST":
-                bookings = bookingRepository.findByItemIdInAndEndIsBefore(itemIds, LocalDateTime.now(), sort);
+                bookings = bookingRepository.findByItemIdInAndEndIsBeforeWithPagination(
+                        itemIds, LocalDateTime.now(), pageable);
                 break;
             case "FUTURE":
-                bookings = bookingRepository.findByItemIdInAndStartIsAfter(itemIds, LocalDateTime.now(), sort);
+                bookings = bookingRepository.findByItemIdInAndStartIsAfterWithPagination(
+                        itemIds, LocalDateTime.now(), pageable);
                 break;
             case "WAITING":
-                bookings = bookingRepository.findByItemIdInAndStatusIs(itemIds, Status.WAITING, sort);
+                bookings = bookingRepository.findByItemIdInAndStatusIsWithPagination(
+                        itemIds, Status.WAITING, pageable);
                 break;
             case "REJECTED":
-                bookings = bookingRepository.findByItemIdInAndStatusIs(itemIds, Status.REJECTED, sort);
+                bookings = bookingRepository.findByItemIdInAndStatusIsWithPagination(
+                        itemIds, Status.REJECTED, pageable);
                 break;
             default:
                 throw new ValidationException("Unknown state: " + state);
         }
 
-        // Применяем пагинацию
-        int startIndex = from;
-        int endIndex = Math.min(startIndex + size, bookings.size());
-
-        if (startIndex > bookings.size()) {
-            return List.of();
-        }
-
-        return bookings.subList(startIndex, endIndex).stream()
+        return bookings.stream()
                 .map(bookingMapper::toBookingDto)
                 .collect(Collectors.toList());
+    }
+
+    // Валидация параметров пагинации
+    private void validatePaginationParameters(Integer from, Integer size) {
+        if (from < 0) {
+            throw new ValidationException("Параметр 'from' не может быть отрицательным");
+        }
+        if (size <= 0) {
+            throw new ValidationException("Параметр 'size' должен быть положительным");
+        }
+    }
+
+    // Валидация дат бронирования
+    private void validateBookingDates(LocalDateTime start, LocalDateTime end) {
+        LocalDateTime now = LocalDateTime.now();
+
+        if (start.isBefore(now)) {
+            throw new ValidationException("Дата начала бронирования не может быть в прошлом");
+        }
+        if (end.isBefore(start) || end.equals(start)) {
+            throw new ValidationException("Дата окончания бронирования должна быть позже даты начала");
+        }
     }
 }
